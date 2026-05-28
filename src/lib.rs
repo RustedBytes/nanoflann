@@ -15,7 +15,7 @@ mod tree;
 pub use dataset::{KdTreeDataset, MatrixDataset, MatrixLayout, PointCloud};
 pub use dynamic::DynamicKdTree;
 pub use error::{KdTreeError, Result};
-pub use metric::{DistanceMetric, L1, L2Simple, L2, SO2, SO3};
+pub use metric::{DistanceMetric, L2Simple, L1, L2, SO2, SO3};
 pub use real::Real;
 pub use result_set::{KnnResultSet, RadiusResultSet, ResultItem, RknnResultSet};
 pub use tree::{Interval, KdTree, KdTreeParams, SearchParameters};

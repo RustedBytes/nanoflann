@@ -106,7 +106,10 @@ where
     }
 
     pub fn active_count(&self) -> usize {
-        self.tree_index.iter().filter(|entry| entry.is_some()).count()
+        self.tree_index
+            .iter()
+            .filter(|entry| entry.is_some())
+            .count()
     }
 
     pub fn all_indices(&self) -> &[KdTree<'a, F, D, M>] {
@@ -208,10 +211,7 @@ where
     }
 
     fn is_active(&self, idx: usize) -> bool {
-        self.tree_index
-            .get(idx)
-            .and_then(|entry| *entry)
-            .is_some()
+        self.tree_index.get(idx).and_then(|entry| *entry).is_some()
     }
 
     pub fn knn_search(&self, query: &[F], num_closest: usize) -> Result<Vec<ResultItem<F>>> {
@@ -250,11 +250,8 @@ where
         num_closest: usize,
         radius: F,
     ) -> Result<Vec<ResultItem<F>>> {
-        let mut result = RknnResultSet::with_first_match(
-            num_closest,
-            radius,
-            self.params.first_match,
-        );
+        let mut result =
+            RknnResultSet::with_first_match(num_closest, radius, self.params.first_match);
         self.find_neighbors_result_set(&mut result, query, SearchParameters::default())?;
         Ok(result.into_vec())
     }

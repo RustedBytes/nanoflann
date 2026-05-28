@@ -1,6 +1,6 @@
 use nanoflann_rs::{
-    DistanceMetric, DynamicKdTree, Interval, KdTree, KdTreeParams, L1, L2Simple, L2, MatrixDataset,
-    MatrixLayout, PointCloud, SearchParameters, SO2,
+    DistanceMetric, DynamicKdTree, Interval, KdTree, KdTreeParams, L2Simple, MatrixDataset,
+    MatrixLayout, PointCloud, SearchParameters, L1, L2, SO2,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -174,8 +174,13 @@ fn matrix_dataset_supports_row_and_column_points() {
         MatrixLayout::RowMajorPoints,
     )
     .unwrap();
-    let row_tree = KdTree::new(row_points.point_dim(), &row_points, L2, KdTreeParams::default())
-        .unwrap();
+    let row_tree = KdTree::new(
+        row_points.point_dim(),
+        &row_points,
+        L2,
+        KdTreeParams::default(),
+    )
+    .unwrap();
     assert_eq!(row_tree.knn_search(&[0.8, 0.1], 1).unwrap()[0].index, 1);
 
     // Same logical points as columns in matrix [[0, 1, 0], [0, 0, 2]].
@@ -186,8 +191,13 @@ fn matrix_dataset_supports_row_and_column_points() {
         MatrixLayout::ColumnMajorPoints,
     )
     .unwrap();
-    let col_tree = KdTree::new(col_points.point_dim(), &col_points, L2, KdTreeParams::default())
-        .unwrap();
+    let col_tree = KdTree::new(
+        col_points.point_dim(),
+        &col_points,
+        L2,
+        KdTreeParams::default(),
+    )
+    .unwrap();
     assert_eq!(col_tree.knn_search(&[0.8, 0.1], 1).unwrap()[0].index, 1);
 }
 

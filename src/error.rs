@@ -12,7 +12,10 @@ pub enum KdTreeError {
     /// algorithm, so the Rust port rejects it during construction.
     InvalidLeafMaxSize,
     /// A query slice did not contain enough components for the tree dimension.
-    QueryDimensionalityMismatch { expected_at_least: usize, got: usize },
+    QueryDimensionalityMismatch {
+        expected_at_least: usize,
+        got: usize,
+    },
     /// A bounding box did not match the tree dimension.
     BoundingBoxDimensionalityMismatch { expected: usize, got: usize },
     /// A dataset-provided bounding box had an invalid shape or bounds.
@@ -27,9 +30,17 @@ pub enum KdTreeError {
     /// The configured dynamic index capacity has been exceeded.
     MaximumPointCountExceeded { maximum_point_count: usize },
     /// Point-cloud construction received rows with inconsistent dimensionality.
-    InconsistentPointDimensionality { expected: usize, got: usize, row: usize },
+    InconsistentPointDimensionality {
+        expected: usize,
+        got: usize,
+        row: usize,
+    },
     /// A flat matrix buffer length was not `rows * cols`.
-    MatrixSizeMismatch { rows: usize, cols: usize, len: usize },
+    MatrixSizeMismatch {
+        rows: usize,
+        cols: usize,
+        len: usize,
+    },
     /// Binary index data was not produced by this crate's serializer.
     InvalidIndexFile(String),
     /// I/O error while saving or loading an index.
@@ -39,9 +50,14 @@ pub enum KdTreeError {
 impl fmt::Display for KdTreeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::InvalidDimensionality => write!(f, "KD-tree dimensionality must be greater than zero"),
+            Self::InvalidDimensionality => {
+                write!(f, "KD-tree dimensionality must be greater than zero")
+            }
             Self::InvalidLeafMaxSize => write!(f, "leaf_max_size must be greater than zero"),
-            Self::QueryDimensionalityMismatch { expected_at_least, got } => write!(
+            Self::QueryDimensionalityMismatch {
+                expected_at_least,
+                got,
+            } => write!(
                 f,
                 "query has {got} dimensions, expected at least {expected_at_least}"
             ),
@@ -57,7 +73,9 @@ impl fmt::Display for KdTreeError {
                 f,
                 "dynamic insertion must add the next point index {expected}, got {got}"
             ),
-            Self::MaximumPointCountExceeded { maximum_point_count } => write!(
+            Self::MaximumPointCountExceeded {
+                maximum_point_count,
+            } => write!(
                 f,
                 "dynamic index capacity exceeded; maximum_point_count={maximum_point_count}"
             ),

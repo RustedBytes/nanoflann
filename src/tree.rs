@@ -488,7 +488,10 @@ where
         if self.size == 0 {
             return Ok(false);
         }
-        let root = self.root_node.as_deref().ok_or(KdTreeError::IndexNotBuilt)?;
+        let root = self
+            .root_node
+            .as_deref()
+            .ok_or(KdTreeError::IndexNotBuilt)?;
 
         let eps_error = F::one() + search_params.eps;
         let mut dists = vec![F::zero(); self.dim];
@@ -556,13 +559,7 @@ where
                 };
 
                 if !self.search_level(
-                    result_set,
-                    query,
-                    best_child,
-                    mindist,
-                    dists,
-                    eps_error,
-                    active,
+                    result_set, query, best_child, mindist, dists, eps_error, active,
                 )? {
                     return Ok(false);
                 }
@@ -630,11 +627,8 @@ where
         num_closest: usize,
         radius: F,
     ) -> Result<Vec<ResultItem<F>>> {
-        let mut result = RknnResultSet::with_first_match(
-            num_closest,
-            radius,
-            self.params.first_match,
-        );
+        let mut result =
+            RknnResultSet::with_first_match(num_closest, radius, self.params.first_match);
         self.find_neighbors_set(&mut result, query, SearchParameters::default(), None)?;
         Ok(result.into_vec())
     }
@@ -645,7 +639,10 @@ where
         if self.size == 0 {
             return Ok(Vec::new());
         }
-        let root = self.root_node.as_deref().ok_or(KdTreeError::IndexNotBuilt)?;
+        let root = self
+            .root_node
+            .as_deref()
+            .ok_or(KdTreeError::IndexNotBuilt)?;
         let mut found = Vec::new();
         let mut stack = vec![root];
 

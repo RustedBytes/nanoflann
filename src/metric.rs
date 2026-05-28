@@ -161,12 +161,7 @@ impl<F: Real, D: KdTreeDataset<F>> DistanceMetric<F, D> for SO3 {
         worst_dist: Option<F>,
     ) -> F {
         <L2Simple as DistanceMetric<F, D>>::eval_metric(
-            &L2Simple,
-            dataset,
-            query,
-            b_idx,
-            size,
-            worst_dist,
+            &L2Simple, dataset, query, b_idx, size, worst_dist,
         )
     }
 
