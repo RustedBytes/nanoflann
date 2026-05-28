@@ -1,6 +1,8 @@
 # nanoflann-rs
 
-A safe Rust KD-tree crate ported from the uploaded `nanoflann.hpp` header.
+[![Crates.io Version](https://img.shields.io/crates/v/nanoflann-rs)](https://crates.io/crates/nanoflann-rs)
+
+A safe Rust KD-tree crate ported from the `nanoflann.hpp` project.
 
 This is not a line-by-line syntax translation. It keeps the behaviorally important pieces of the C++ API while replacing raw pointers, pooled allocation, output buffers, and template-heavy result sets with safe Rust ownership and `Result`-based errors.
 
