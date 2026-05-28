@@ -568,8 +568,8 @@ where
                 mindist = mindist + cut_dist - old_dist;
                 dists[idx] = cut_dist;
 
-                if mindist * eps_error <= result_set.worst_dist() {
-                    if !self.search_level(
+                if mindist * eps_error <= result_set.worst_dist()
+                    && !self.search_level(
                         result_set,
                         query,
                         other_child,
@@ -580,7 +580,6 @@ where
                     )? {
                         return Ok(false);
                     }
-                }
 
                 dists[idx] = old_dist;
                 Ok(true)
