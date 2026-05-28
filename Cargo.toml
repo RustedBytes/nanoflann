@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 license = "BSD-2-Clause"
 description = "Safe Rust KD-tree port inspired by nanoflann's adaptor API"
-repository = ""
+repository = "https://github.com/RustedBytes/nanoflann"
 readme = "README.md"
 
 [lib]
