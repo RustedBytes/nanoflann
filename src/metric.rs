@@ -43,6 +43,7 @@ pub struct SO2;
 pub struct SO3;
 
 impl<F: Real, D: KdTreeDataset<F>> DistanceMetric<F, D> for L1 {
+    #[inline]
     fn eval_metric(
         &self,
         dataset: &D,
@@ -64,12 +65,14 @@ impl<F: Real, D: KdTreeDataset<F>> DistanceMetric<F, D> for L1 {
         result
     }
 
+    #[inline]
     fn accum_dist(&self, a: F, b: F, _dim: usize) -> F {
         (a - b).abs()
     }
 }
 
 impl<F: Real, D: KdTreeDataset<F>> DistanceMetric<F, D> for L2 {
+    #[inline]
     fn eval_metric(
         &self,
         dataset: &D,
@@ -92,6 +95,7 @@ impl<F: Real, D: KdTreeDataset<F>> DistanceMetric<F, D> for L2 {
         result
     }
 
+    #[inline]
     fn accum_dist(&self, a: F, b: F, _dim: usize) -> F {
         let diff = a - b;
         diff * diff
@@ -99,6 +103,7 @@ impl<F: Real, D: KdTreeDataset<F>> DistanceMetric<F, D> for L2 {
 }
 
 impl<F: Real, D: KdTreeDataset<F>> DistanceMetric<F, D> for L2Simple {
+    #[inline]
     fn eval_metric(
         &self,
         dataset: &D,
@@ -115,6 +120,7 @@ impl<F: Real, D: KdTreeDataset<F>> DistanceMetric<F, D> for L2Simple {
         result
     }
 
+    #[inline]
     fn accum_dist(&self, a: F, b: F, _dim: usize) -> F {
         let diff = a - b;
         diff * diff
@@ -122,6 +128,7 @@ impl<F: Real, D: KdTreeDataset<F>> DistanceMetric<F, D> for L2Simple {
 }
 
 impl<F: Real, D: KdTreeDataset<F>> DistanceMetric<F, D> for SO2 {
+    #[inline]
     fn eval_metric(
         &self,
         dataset: &D,
@@ -138,6 +145,7 @@ impl<F: Real, D: KdTreeDataset<F>> DistanceMetric<F, D> for SO2 {
         )
     }
 
+    #[inline]
     fn accum_dist(&self, a: F, b: F, _dim: usize) -> F {
         let pi = F::from_f64(std::f64::consts::PI);
         let two_pi = F::from_f64(2.0 * std::f64::consts::PI);
@@ -152,6 +160,7 @@ impl<F: Real, D: KdTreeDataset<F>> DistanceMetric<F, D> for SO2 {
 }
 
 impl<F: Real, D: KdTreeDataset<F>> DistanceMetric<F, D> for SO3 {
+    #[inline]
     fn eval_metric(
         &self,
         dataset: &D,
@@ -165,6 +174,7 @@ impl<F: Real, D: KdTreeDataset<F>> DistanceMetric<F, D> for SO3 {
         )
     }
 
+    #[inline]
     fn accum_dist(&self, a: F, b: F, dim: usize) -> F {
         <L2Simple as DistanceMetric<F, D>>::accum_dist(&L2Simple, a, b, dim)
     }

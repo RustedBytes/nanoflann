@@ -171,9 +171,11 @@ where
             self.tree_index[idx] = Some(pos);
 
             for tree_id in 0..pos {
-                let moved: Vec<usize> = self.indices[tree_id].v_acc.drain(..).collect();
-                for point_idx in moved {
-                    self.indices[pos].v_acc.push(point_idx);
+                let (left_part, right_part) = self.indices.split_at_mut(pos);
+                let src_tree = &mut left_part[tree_id];
+                let dst_tree = &mut right_part[0];
+                for point_idx in src_tree.v_acc.drain(..) {
+                    dst_tree.v_acc.push(point_idx);
                     if self
                         .tree_index
                         .get(point_idx)
@@ -270,7 +272,7 @@ where
                 result,
                 query,
                 per_tree_params,
-                Some(&active as &dyn Fn(usize) -> bool),
+                crate::tree::FnFilter(active),
             )?;
         }
         if search_params.sorted {

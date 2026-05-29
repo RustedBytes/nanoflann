@@ -5,6 +5,26 @@ use crate::real::Real;
 use crate::result_set::{KnnResultSet, RadiusResultSet, ResultItem, ResultSet, RknnResultSet};
 use std::io::{Read, Write};
 
+pub(crate) trait ActiveFilter {
+    fn is_active(&self, idx: usize) -> bool;
+}
+
+pub(crate) struct NoFilter;
+impl ActiveFilter for NoFilter {
+    #[inline(always)]
+    fn is_active(&self, _idx: usize) -> bool {
+        true
+    }
+}
+
+pub(crate) struct FnFilter<F: Fn(usize) -> bool>(pub F);
+impl<F: Fn(usize) -> bool> ActiveFilter for FnFilter<F> {
+    #[inline(always)]
+    fn is_active(&self, idx: usize) -> bool {
+        (self.0)(idx)
+    }
+}
+
 const INDEX_MAGIC: &[u8; 7] = b"NKDRS01";
 
 /// Closed interval for one dimension of a bounding box.
@@ -214,6 +234,7 @@ where
         Ok(())
     }
 
+    #[inline]
     fn dataset_get(&self, idx: usize, component: usize) -> F {
         self.dataset.kdtree_get_pt(idx, component)
     }
@@ -275,7 +296,7 @@ where
         &mut self,
         left: usize,
         right: usize,
-        bbox: &mut Vec<Interval<F>>,
+        bbox: &mut [Interval<F>],
     ) -> Result<Box<Node<F>>> {
         debug_assert!(left < right);
         let count = right - left;
@@ -302,13 +323,29 @@ where
 
         let (index, cutfeat, cutval) = self.middle_split(left, count, bbox)?;
 
-        let mut left_bbox = bbox.clone();
+        let mut left_bbox_local = [Interval::zero(); 32];
+        let mut left_bbox_vec;
+        let left_bbox = if self.dim <= 32 {
+            left_bbox_local[..self.dim].copy_from_slice(&bbox[..self.dim]);
+            &mut left_bbox_local[..self.dim]
+        } else {
+            left_bbox_vec = bbox.to_vec();
+            &mut left_bbox_vec[..]
+        };
         left_bbox[cutfeat].high = cutval;
-        let child1 = self.divide_tree(left, left + index, &mut left_bbox)?;
+        let child1 = self.divide_tree(left, left + index, left_bbox)?;
 
-        let mut right_bbox = bbox.clone();
+        let mut right_bbox_local = [Interval::zero(); 32];
+        let mut right_bbox_vec;
+        let right_bbox = if self.dim <= 32 {
+            right_bbox_local[..self.dim].copy_from_slice(&bbox[..self.dim]);
+            &mut right_bbox_local[..self.dim]
+        } else {
+            right_bbox_vec = bbox.to_vec();
+            &mut right_bbox_vec[..]
+        };
         right_bbox[cutfeat].low = cutval;
-        let child2 = self.divide_tree(left + index, right, &mut right_bbox)?;
+        let child2 = self.divide_tree(left + index, right, right_bbox)?;
 
         let divlow = left_bbox[cutfeat].high;
         let divhigh = right_bbox[cutfeat].low;
@@ -353,22 +390,38 @@ where
             }
         }
 
-        let mut candidates = Vec::with_capacity(self.dim);
+        let mut candidates_local = [0usize; 32];
+        let mut candidates_len = 0;
+        let mut candidates_vec = Vec::new();
         for dim in 0..self.dim {
             if bbox[dim].high - bbox[dim].low >= one_minus_eps * max_span {
-                candidates.push(dim);
+                if self.dim <= 32 {
+                    candidates_local[candidates_len] = dim;
+                    candidates_len += 1;
+                } else {
+                    candidates_vec.push(dim);
+                }
             }
         }
-        if candidates.is_empty() {
-            candidates.push(0);
-        }
+        let candidates = if self.dim <= 32 {
+            if candidates_len == 0 {
+                candidates_local[0] = 0;
+                candidates_len = 1;
+            }
+            &candidates_local[..candidates_len]
+        } else {
+            if candidates_vec.is_empty() {
+                candidates_vec.push(0);
+            }
+            &candidates_vec[..]
+        };
 
         let mut cutfeat = 0;
         let mut max_spread = F::from_f64(-1.0);
         let mut min_elem = F::zero();
         let mut max_elem = F::zero();
 
-        for dim in candidates {
+        for &dim in candidates {
             let first = self.dataset_get(self.v_acc[ind], dim);
             let mut local_min = first;
             let mut local_max = first;
@@ -448,6 +501,7 @@ where
         (left, mid)
     }
 
+    #[inline]
     fn compute_initial_distances(&self, query: &[F], dists: &mut [F]) -> F {
         let mut dist = F::zero();
         for dim in 0..self.dim {
@@ -467,6 +521,7 @@ where
         dist
     }
 
+    #[inline]
     fn ensure_query_dim(&self, query: &[F]) -> Result<()> {
         if query.len() < self.dim {
             return Err(KdTreeError::QueryDimensionalityMismatch {
@@ -477,13 +532,17 @@ where
         Ok(())
     }
 
-    pub(crate) fn find_neighbors_set<R: ResultSet<F>>(
+    pub(crate) fn find_neighbors_set<R, A>(
         &self,
         result: &mut R,
         query: &[F],
         search_params: SearchParameters<F>,
-        active: Option<&dyn Fn(usize) -> bool>,
-    ) -> Result<bool> {
+        active: A,
+    ) -> Result<bool>
+    where
+        R: ResultSet<F>,
+        A: ActiveFilter,
+    {
         self.ensure_query_dim(query)?;
         if self.size == 0 {
             return Ok(false);
@@ -494,9 +553,16 @@ where
             .ok_or(KdTreeError::IndexNotBuilt)?;
 
         let eps_error = F::one() + search_params.eps;
-        let mut dists = vec![F::zero(); self.dim];
-        let dist = self.compute_initial_distances(query, &mut dists);
-        self.search_level(result, query, root, dist, &mut dists, eps_error, active)?;
+        let mut dists_local = [F::zero(); 32];
+        let mut dists_vec;
+        let dists = if self.dim <= 32 {
+            &mut dists_local[..self.dim]
+        } else {
+            dists_vec = vec![F::zero(); self.dim];
+            &mut dists_vec[..]
+        };
+        let dist = self.compute_initial_distances(query, dists);
+        self.search_level(result, query, root, dist, dists, eps_error, &active)?;
 
         if search_params.sorted {
             result.sort();
@@ -504,7 +570,7 @@ where
         Ok(result.full())
     }
 
-    fn search_level<R: ResultSet<F>>(
+    fn search_level<R, A>(
         &self,
         result_set: &mut R,
         query: &[F],
@@ -512,16 +578,18 @@ where
         mut mindist: F,
         dists: &mut [F],
         eps_error: F,
-        active: Option<&dyn Fn(usize) -> bool>,
-    ) -> Result<bool> {
+        active: &A,
+    ) -> Result<bool>
+    where
+        R: ResultSet<F>,
+        A: ActiveFilter,
+    {
         match node {
             Node::Leaf { left, right } => {
                 for offset in *left..*right {
                     let idx = self.v_acc[offset];
-                    if let Some(is_active) = active {
-                        if !is_active(idx) {
-                            continue;
-                        }
+                    if !active.is_active(idx) {
+                        continue;
                     }
                     let dist = self
                         .metric
@@ -599,7 +667,7 @@ where
         search_params: SearchParameters<F>,
     ) -> Result<Vec<ResultItem<F>>> {
         let mut result = KnnResultSet::with_first_match(num_closest, self.params.first_match);
-        self.find_neighbors_set(&mut result, query, search_params, None)?;
+        self.find_neighbors_set(&mut result, query, search_params, NoFilter)?;
         Ok(result.into_vec())
     }
 
@@ -615,7 +683,7 @@ where
         search_params: SearchParameters<F>,
     ) -> Result<Vec<ResultItem<F>>> {
         let mut result = RadiusResultSet::new(radius);
-        self.find_neighbors_set(&mut result, query, search_params, None)?;
+        self.find_neighbors_set(&mut result, query, search_params, NoFilter)?;
         Ok(result.into_vec())
     }
 
@@ -628,7 +696,7 @@ where
     ) -> Result<Vec<ResultItem<F>>> {
         let mut result =
             RknnResultSet::with_first_match(num_closest, radius, self.params.first_match);
-        self.find_neighbors_set(&mut result, query, SearchParameters::default(), None)?;
+        self.find_neighbors_set(&mut result, query, SearchParameters::default(), NoFilter)?;
         Ok(result.into_vec())
     }
 
@@ -643,9 +711,18 @@ where
             .as_deref()
             .ok_or(KdTreeError::IndexNotBuilt)?;
         let mut found = Vec::new();
-        let mut stack = vec![root];
+        let mut stack_local = [root; 64];
+        let mut stack_len = 1;
+        let mut stack_vec = Vec::new();
 
-        while let Some(node) = stack.pop() {
+        while stack_len > 0 || !stack_vec.is_empty() {
+            let node = if !stack_vec.is_empty() {
+                stack_vec.pop().unwrap()
+            } else {
+                stack_len -= 1;
+                stack_local[stack_len]
+            };
+
             match node {
                 Node::Leaf { left, right } => {
                     for offset in *left..*right {
@@ -663,10 +740,20 @@ where
                     child2,
                 } => {
                     if bbox[*divfeat].low <= *divlow {
-                        stack.push(child1.as_ref());
+                        if stack_vec.is_empty() && stack_len < 64 {
+                            stack_local[stack_len] = child1.as_ref();
+                            stack_len += 1;
+                        } else {
+                            stack_vec.push(child1.as_ref());
+                        }
                     }
                     if bbox[*divfeat].high >= *divhigh {
-                        stack.push(child2.as_ref());
+                        if stack_vec.is_empty() && stack_len < 64 {
+                            stack_local[stack_len] = child2.as_ref();
+                            stack_len += 1;
+                        } else {
+                            stack_vec.push(child2.as_ref());
+                        }
                     }
                 }
             }
@@ -675,6 +762,7 @@ where
         Ok(found)
     }
 
+    #[inline]
     fn contains(&self, bbox: &[Interval<F>], idx: usize) -> bool {
         for dim in 0..self.dim {
             let point = self.dataset.kdtree_get_pt(idx, dim);

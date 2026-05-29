@@ -25,12 +25,14 @@ pub(crate) trait ResultSet<F: Real> {
     fn sort(&mut self);
 }
 
+#[inline]
 fn compare_distance<F: Real>(a: &ResultItem<F>, b: &ResultItem<F>) -> Ordering {
     a.distance
         .partial_cmp(&b.distance)
         .unwrap_or(Ordering::Equal)
 }
 
+#[inline]
 fn insert_sorted_bounded<F: Real>(
     items: &mut Vec<ResultItem<F>>,
     item: ResultItem<F>,
@@ -92,6 +94,7 @@ impl<F: Real> KnnResultSet<F> {
 }
 
 impl<F: Real> ResultSet<F> for KnnResultSet<F> {
+    #[inline]
     fn add_point(&mut self, distance: F, index: usize) -> bool {
         insert_sorted_bounded(
             &mut self.items,
@@ -102,6 +105,7 @@ impl<F: Real> ResultSet<F> for KnnResultSet<F> {
         true
     }
 
+    #[inline]
     fn worst_dist(&self) -> F {
         if self.items.len() < self.capacity || self.items.is_empty() {
             F::max_value()
@@ -110,14 +114,17 @@ impl<F: Real> ResultSet<F> for KnnResultSet<F> {
         }
     }
 
+    #[inline]
     fn size(&self) -> usize {
         self.items.len()
     }
 
+    #[inline]
     fn full(&self) -> bool {
         self.items.len() == self.capacity
     }
 
+    #[inline]
     fn sort(&mut self) {
         // KNN insertion keeps the vector sorted already.
     }
@@ -156,6 +163,7 @@ impl<F: Real> RknnResultSet<F> {
 }
 
 impl<F: Real> ResultSet<F> for RknnResultSet<F> {
+    #[inline]
     fn add_point(&mut self, distance: F, index: usize) -> bool {
         insert_sorted_bounded(
             &mut self.items,
@@ -166,6 +174,7 @@ impl<F: Real> ResultSet<F> for RknnResultSet<F> {
         true
     }
 
+    #[inline]
     fn worst_dist(&self) -> F {
         if self.items.len() < self.capacity || self.items.is_empty() {
             self.radius
@@ -174,14 +183,17 @@ impl<F: Real> ResultSet<F> for RknnResultSet<F> {
         }
     }
 
+    #[inline]
     fn size(&self) -> usize {
         self.items.len()
     }
 
+    #[inline]
     fn full(&self) -> bool {
         self.items.len() == self.capacity
     }
 
+    #[inline]
     fn sort(&mut self) {
         // RKNN insertion keeps the vector sorted already.
     }
@@ -227,6 +239,7 @@ impl<F: Real> RadiusResultSet<F> {
 }
 
 impl<F: Real> ResultSet<F> for RadiusResultSet<F> {
+    #[inline]
     fn add_point(&mut self, distance: F, index: usize) -> bool {
         if distance < self.radius {
             self.items.push(ResultItem::new(index, distance));
@@ -234,18 +247,22 @@ impl<F: Real> ResultSet<F> for RadiusResultSet<F> {
         true
     }
 
+    #[inline]
     fn worst_dist(&self) -> F {
         self.radius
     }
 
+    #[inline]
     fn size(&self) -> usize {
         self.items.len()
     }
 
+    #[inline]
     fn full(&self) -> bool {
         true
     }
 
+    #[inline]
     fn sort(&mut self) {
         self.items.sort_by(compare_distance);
     }
