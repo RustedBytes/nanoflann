@@ -252,7 +252,10 @@ where
         let len = self.dataset.kdtree_get_point_count();
         for &idx in &self.v_acc {
             if idx as usize >= len {
-                return Err(KdTreeError::IndexOutOfBounds { index: idx as usize, len });
+                return Err(KdTreeError::IndexOutOfBounds {
+                    index: idx as usize,
+                    len,
+                });
             }
         }
         Ok(())

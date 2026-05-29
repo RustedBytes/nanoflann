@@ -108,8 +108,14 @@ fn bench_knn_search_zero_alloc(c: &mut Criterion) {
                             &query,
                             |b, q| {
                                 b.iter(|| {
-                                    let mut result: nanoflann::SmallKnnResultSet<f64, 1> = nanoflann::SmallKnnResultSet::new();
-                                    tree.knn_search_into(black_box(q), &mut result, Default::default()).expect("search ok");
+                                    let mut result: nanoflann::SmallKnnResultSet<f64, 1> =
+                                        nanoflann::SmallKnnResultSet::new();
+                                    tree.knn_search_into(
+                                        black_box(q),
+                                        &mut result,
+                                        Default::default(),
+                                    )
+                                    .expect("search ok");
                                     black_box(result.len())
                                 })
                             },
@@ -121,8 +127,14 @@ fn bench_knn_search_zero_alloc(c: &mut Criterion) {
                             &query,
                             |b, q| {
                                 b.iter(|| {
-                                    let mut result: nanoflann::SmallKnnResultSet<f64, 10> = nanoflann::SmallKnnResultSet::new();
-                                    tree.knn_search_into(black_box(q), &mut result, Default::default()).expect("search ok");
+                                    let mut result: nanoflann::SmallKnnResultSet<f64, 10> =
+                                        nanoflann::SmallKnnResultSet::new();
+                                    tree.knn_search_into(
+                                        black_box(q),
+                                        &mut result,
+                                        Default::default(),
+                                    )
+                                    .expect("search ok");
                                     black_box(result.len())
                                 })
                             },
@@ -134,8 +146,14 @@ fn bench_knn_search_zero_alloc(c: &mut Criterion) {
                             &query,
                             |b, q| {
                                 b.iter(|| {
-                                    let mut result: nanoflann::SmallKnnResultSet<f64, 100> = nanoflann::SmallKnnResultSet::new();
-                                    tree.knn_search_into(black_box(q), &mut result, Default::default()).expect("search ok");
+                                    let mut result: nanoflann::SmallKnnResultSet<f64, 100> =
+                                        nanoflann::SmallKnnResultSet::new();
+                                    tree.knn_search_into(
+                                        black_box(q),
+                                        &mut result,
+                                        Default::default(),
+                                    )
+                                    .expect("search ok");
                                     black_box(result.len())
                                 })
                             },
@@ -152,7 +170,8 @@ fn bench_knn_search_zero_alloc(c: &mut Criterion) {
                         let mut result = nanoflann::KnnResultSet::new(k);
                         b.iter(|| {
                             result.clear();
-                            tree.knn_search_into(black_box(q), &mut result, Default::default()).expect("search ok");
+                            tree.knn_search_into(black_box(q), &mut result, Default::default())
+                                .expect("search ok");
                             black_box(result.size())
                         })
                     },
