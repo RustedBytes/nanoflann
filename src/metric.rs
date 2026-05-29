@@ -1,3 +1,5 @@
+#![allow(clippy::needless_range_loop)]
+
 use crate::dataset::KdTreeDataset;
 use crate::real::Real;
 

@@ -1,3 +1,5 @@
+#![allow(clippy::needless_range_loop)]
+
 use crate::dataset::KdTreeDataset;
 use crate::error::{KdTreeError, Result};
 use crate::metric::DistanceMetric;
@@ -91,18 +93,21 @@ impl Default for KdTreeParams {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct NodeId(u32);
+
 #[derive(Clone, Debug)]
 pub(crate) enum Node<F: Real> {
     Leaf {
-        left: usize,
-        right: usize,
+        left: u32,
+        right: u32,
     },
     Split {
-        divfeat: usize,
+        divfeat: u16,
         divlow: F,
         divhigh: F,
-        child1: Box<Node<F>>,
-        child2: Box<Node<F>>,
+        child1: NodeId,
+        child2: NodeId,
     },
 }
 
@@ -118,7 +123,8 @@ where
     params: KdTreeParams,
     dim: usize,
     pub(crate) v_acc: Vec<usize>,
-    pub(crate) root_node: Option<Box<Node<F>>>,
+    nodes: Vec<Node<F>>,
+    pub(crate) root_node: Option<NodeId>,
     root_bbox: Vec<Interval<F>>,
     size: usize,
     size_at_index_build: usize,
@@ -147,6 +153,7 @@ where
             params,
             dim,
             v_acc: Vec::new(),
+            nodes: Vec::new(),
             root_node: None,
             root_bbox: vec![Interval::zero(); dim],
             size,
@@ -297,7 +304,7 @@ where
         left: usize,
         right: usize,
         bbox: &mut [Interval<F>],
-    ) -> Result<Box<Node<F>>> {
+    ) -> Result<NodeId> {
         debug_assert!(left < right);
         let count = right - left;
 
@@ -318,7 +325,13 @@ where
                     }
                 }
             }
-            return Ok(Box::new(Node::Leaf { left, right }));
+            let node = Node::Leaf {
+                left: left as u32,
+                right: right as u32,
+            };
+            let id = NodeId(self.nodes.len() as u32);
+            self.nodes.push(node);
+            return Ok(id);
         }
 
         let (index, cutfeat, cutval) = self.middle_split(left, count, bbox)?;
@@ -363,13 +376,16 @@ where
             };
         }
 
-        Ok(Box::new(Node::Split {
-            divfeat: cutfeat,
+        let node = Node::Split {
+            divfeat: cutfeat as u16,
             divlow,
             divhigh,
             child1,
             child2,
-        }))
+        };
+        let id = NodeId(self.nodes.len() as u32);
+        self.nodes.push(node);
+        Ok(id)
     }
 
     fn middle_split(
@@ -547,10 +563,7 @@ where
         if self.size == 0 {
             return Ok(false);
         }
-        let root = self
-            .root_node
-            .as_deref()
-            .ok_or(KdTreeError::IndexNotBuilt)?;
+        let root = self.root_node.ok_or(KdTreeError::IndexNotBuilt)?;
 
         let eps_error = F::one() + search_params.eps;
         let mut dists_local = [F::zero(); 32];
@@ -570,11 +583,12 @@ where
         Ok(result.full())
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn search_level<R, A>(
         &self,
         result_set: &mut R,
         query: &[F],
-        node: &Node<F>,
+        node_id: NodeId,
         mut mindist: F,
         dists: &mut [F],
         eps_error: F,
@@ -584,16 +598,21 @@ where
         R: ResultSet<F>,
         A: ActiveFilter,
     {
+        let node = &self.nodes[node_id.0 as usize];
         match node {
             Node::Leaf { left, right } => {
-                for offset in *left..*right {
+                for offset in *left as usize..*right as usize {
                     let idx = self.v_acc[offset];
                     if !active.is_active(idx) {
                         continue;
                     }
-                    let dist = self
-                        .metric
-                        .eval_metric(self.dataset, query, idx, self.dim, None);
+                    let dist = self.metric.eval_metric(
+                        self.dataset,
+                        query,
+                        idx,
+                        self.dim,
+                        Some(result_set.worst_dist()),
+                    );
                     if dist < result_set.worst_dist() && !result_set.add_point(dist, idx) {
                         return Ok(false);
                     }
@@ -607,21 +626,21 @@ where
                 child1,
                 child2,
             } => {
-                let idx = *divfeat;
+                let idx = *divfeat as usize;
                 let value = query[idx];
                 let diff1 = value - *divlow;
                 let diff2 = value - *divhigh;
 
                 let (best_child, other_child, cut_dist) = if diff1 + diff2 < F::zero() {
                     (
-                        child1.as_ref(),
-                        child2.as_ref(),
+                        *child1,
+                        *child2,
                         self.metric.accum_dist(value, *divhigh, idx),
                     )
                 } else {
                     (
-                        child2.as_ref(),
-                        child1.as_ref(),
+                        *child2,
+                        *child1,
                         self.metric.accum_dist(value, *divlow, idx),
                     )
                 };
@@ -707,26 +726,24 @@ where
         if self.size == 0 {
             return Ok(Vec::new());
         }
-        let root = self
-            .root_node
-            .as_deref()
-            .ok_or(KdTreeError::IndexNotBuilt)?;
+        let root = self.root_node.ok_or(KdTreeError::IndexNotBuilt)?;
         let mut found = Vec::new();
         let mut stack_local = [root; 64];
         let mut stack_len = 1;
         let mut stack_vec = Vec::new();
 
         while stack_len > 0 || !stack_vec.is_empty() {
-            let node = if !stack_vec.is_empty() {
+            let node_id = if !stack_vec.is_empty() {
                 stack_vec.pop().unwrap()
             } else {
                 stack_len -= 1;
                 stack_local[stack_len]
             };
+            let node = &self.nodes[node_id.0 as usize];
 
             match node {
                 Node::Leaf { left, right } => {
-                    for offset in *left..*right {
+                    for offset in *left as usize..*right as usize {
                         let idx = self.v_acc[offset];
                         if self.contains(bbox, idx) {
                             found.push(idx);
@@ -740,20 +757,20 @@ where
                     child1,
                     child2,
                 } => {
-                    if bbox[*divfeat].low <= *divlow {
+                    if bbox[*divfeat as usize].low <= *divlow {
                         if stack_vec.is_empty() && stack_len < 64 {
-                            stack_local[stack_len] = child1.as_ref();
+                            stack_local[stack_len] = *child1;
                             stack_len += 1;
                         } else {
-                            stack_vec.push(child1.as_ref());
+                            stack_vec.push(*child1);
                         }
                     }
-                    if bbox[*divfeat].high >= *divhigh {
+                    if bbox[*divfeat as usize].high >= *divhigh {
                         if stack_vec.is_empty() && stack_len < 64 {
-                            stack_local[stack_len] = child2.as_ref();
+                            stack_local[stack_len] = *child2;
                             stack_len += 1;
                         } else {
-                            stack_vec.push(child2.as_ref());
+                            stack_vec.push(*child2);
                         }
                     }
                 }
@@ -793,10 +810,10 @@ where
             write_f64(writer, interval.low.to_f64())?;
             write_f64(writer, interval.high.to_f64())?;
         }
-        match self.root_node.as_deref() {
-            Some(node) => {
+        match self.root_node {
+            Some(root_id) => {
                 writer.write_all(&[1])?;
-                write_node(writer, node)?;
+                self.write_node(writer, root_id)?;
             }
             None => writer.write_all(&[0])?,
         }
@@ -847,10 +864,11 @@ where
 
         let mut present = [0u8; 1];
         reader.read_exact(&mut present)?;
+        self.nodes.clear();
         self.root_node = if present[0] == 0 {
             None
         } else if present[0] == 1 {
-            Some(read_node(reader)?)
+            Some(read_node_direct(reader, &mut self.nodes)?)
         } else {
             return Err(KdTreeError::InvalidIndexFile(format!(
                 "invalid root-node presence byte {}",
@@ -883,53 +901,65 @@ fn read_f64<R: Read>(reader: &mut R) -> Result<f64> {
     Ok(f64::from_le_bytes(bytes))
 }
 
-fn write_node<W: Write, F: Real>(writer: &mut W, node: &Node<F>) -> Result<()> {
-    match node {
-        Node::Leaf { left, right } => {
-            writer.write_all(&[0])?;
-            write_u64(writer, *left)?;
-            write_u64(writer, *right)?;
-        }
-        Node::Split {
-            divfeat,
-            divlow,
-            divhigh,
-            child1,
-            child2,
-        } => {
-            writer.write_all(&[1])?;
-            write_u64(writer, *divfeat)?;
-            write_f64(writer, divlow.to_f64())?;
-            write_f64(writer, divhigh.to_f64())?;
-            write_node(writer, child1)?;
-            write_node(writer, child2)?;
-        }
-    }
-    Ok(())
-}
-
-fn read_node<R: Read, F: Real>(reader: &mut R) -> Result<Box<Node<F>>> {
-    let mut tag = [0u8; 1];
-    reader.read_exact(&mut tag)?;
-    match tag[0] {
-        0 => {
-            let left = read_u64(reader)?;
-            let right = read_u64(reader)?;
-            Ok(Box::new(Node::Leaf { left, right }))
-        }
-        1 => {
-            let divfeat = read_u64(reader)?;
-            let divlow = F::from_f64(read_f64(reader)?);
-            let divhigh = F::from_f64(read_f64(reader)?);
-            let child1 = read_node(reader)?;
-            let child2 = read_node(reader)?;
-            Ok(Box::new(Node::Split {
+impl<'a, F, D, M> KdTree<'a, F, D, M>
+where
+    F: Real,
+    D: KdTreeDataset<F>,
+    M: DistanceMetric<F, D>,
+{
+    fn write_node<W: Write>(&self, writer: &mut W, id: NodeId) -> Result<()> {
+        match &self.nodes[id.0 as usize] {
+            Node::Leaf { left, right } => {
+                writer.write_all(&[0])?;
+                write_u64(writer, *left as usize)?;
+                write_u64(writer, *right as usize)?;
+            }
+            Node::Split {
                 divfeat,
                 divlow,
                 divhigh,
                 child1,
                 child2,
-            }))
+            } => {
+                writer.write_all(&[1])?;
+                write_u64(writer, *divfeat as usize)?;
+                write_f64(writer, divlow.to_f64())?;
+                write_f64(writer, divhigh.to_f64())?;
+                self.write_node(writer, *child1)?;
+                self.write_node(writer, *child2)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+fn read_node_direct<R: Read, F: Real>(reader: &mut R, nodes: &mut Vec<Node<F>>) -> Result<NodeId> {
+    let mut tag = [0u8; 1];
+    reader.read_exact(&mut tag)?;
+    match tag[0] {
+        0 => {
+            let left = read_u64(reader)? as u32;
+            let right = read_u64(reader)? as u32;
+            let id = NodeId(nodes.len() as u32);
+            nodes.push(Node::Leaf { left, right });
+            Ok(id)
+        }
+        1 => {
+            let divfeat = read_u64(reader)? as u16;
+            let divlow = F::from_f64(read_f64(reader)?);
+            let divhigh = F::from_f64(read_f64(reader)?);
+            // Read children first so their NodeIds are valid
+            let child1 = read_node_direct(reader, nodes)?;
+            let child2 = read_node_direct(reader, nodes)?;
+            let id = NodeId(nodes.len() as u32);
+            nodes.push(Node::Split {
+                divfeat,
+                divlow,
+                divhigh,
+                child1,
+                child2,
+            });
+            Ok(id)
         }
         other => Err(KdTreeError::InvalidIndexFile(format!(
             "invalid node tag {other}"

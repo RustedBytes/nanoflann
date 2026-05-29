@@ -1,4 +1,4 @@
-use nanoflann_rs::{
+use nanoflann::{
     DistanceMetric, DynamicKdTree, Interval, KdTree, KdTreeParams, L2Simple, MatrixDataset,
     MatrixLayout, PointCloud, SearchParameters, L1, L2, SO2,
 };
@@ -131,8 +131,10 @@ fn find_within_box_is_inclusive() {
 #[test]
 fn skip_initial_build_reports_unbuilt_until_build_index() {
     let cloud = sample_cloud();
-    let mut params = KdTreeParams::default();
-    params.skip_initial_build = true;
+    let params = KdTreeParams {
+        skip_initial_build: true,
+        ..Default::default()
+    };
     let mut tree = KdTree::new(2, &cloud, L2, params).unwrap();
 
     assert!(tree.knn_search(&[0.0, 0.0], 1).is_err());
@@ -150,8 +152,10 @@ fn save_and_load_round_trip_preserves_queries() {
     let mut bytes = Vec::new();
     tree.save_index(&mut bytes).unwrap();
 
-    let mut params = KdTreeParams::default();
-    params.skip_initial_build = true;
+    let params = KdTreeParams {
+        skip_initial_build: true,
+        ..Default::default()
+    };
     let mut loaded = KdTree::new(2, &cloud, L2, params).unwrap();
     let mut slice = bytes.as_slice();
     loaded.load_index(&mut slice).unwrap();

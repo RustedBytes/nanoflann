@@ -8,7 +8,7 @@ repository = "https://github.com/RustedBytes/nanoflann"
 readme = "README.md"
 
 [lib]
-name = "nanoflann_rs"
+name = "nanoflann"
 path = "src/lib.rs"
 
 [dependencies]

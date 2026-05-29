@@ -1,6 +1,6 @@
-use nanoflann_rs::{KdTree, KdTreeParams, PointCloud, L2};
+use nanoflann::{KdTree, KdTreeParams, PointCloud, L2};
 
-fn main() -> nanoflann_rs::Result<()> {
+fn main() -> nanoflann::Result<()> {
     let cloud = PointCloud::new(vec![vec![0.0, 0.0], vec![1.0, 0.0], vec![0.0, 2.0]])?;
 
     let tree = KdTree::new(2, &cloud, L2, KdTreeParams::default())?;
