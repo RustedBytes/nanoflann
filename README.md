@@ -48,9 +48,3 @@ cargo +nightly clippy --all-targets --all-features -- -D warnings
 ```bash
 cargo bench
 ```
-
-See [BENCHMARKS.md](BENCHMARKS.md) for details on measured workloads and instructions for comparing nanoflann **0.2.0** vs **0.3.0**.
-
-## Notes
-
-The original C++ library supports arbitrary template instantiations. This Rust port supports `f32` and `f64`, which are the common point-cloud and computer-vision cases. L2 distances and L2 radii are squared, matching nanoflann.
