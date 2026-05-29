@@ -40,7 +40,7 @@ fn main() -> nanoflann::Result<()> {
 ```bash
 cargo test
 cargo fmt
-cargo clippy --all-targets --all-features -- -D warnings
+cargo +nightly clippy --all-targets --all-features -- -D warnings
 ```
 
 ## Benchmarking
