@@ -23,6 +23,7 @@ pub trait ResultSet<F: Real> {
     fn size(&self) -> usize;
     fn full(&self) -> bool;
     fn sort(&mut self);
+    fn clear(&mut self) {}
 }
 
 #[inline]
@@ -128,6 +129,11 @@ impl<F: Real> ResultSet<F> for KnnResultSet<F> {
     fn sort(&mut self) {
         // KNN insertion keeps the vector sorted already.
     }
+
+    #[inline]
+    fn clear(&mut self) {
+        self.items.clear();
+    }
 }
 
 /// Result set for radius-limited k-nearest-neighbor queries.
@@ -197,6 +203,11 @@ impl<F: Real> ResultSet<F> for RknnResultSet<F> {
     fn sort(&mut self) {
         // RKNN insertion keeps the vector sorted already.
     }
+
+    #[inline]
+    fn clear(&mut self) {
+        self.items.clear();
+    }
 }
 
 /// Result set for radius queries. The radius comparison is strict (`distance < radius`),
@@ -265,6 +276,11 @@ impl<F: Real> ResultSet<F> for RadiusResultSet<F> {
     #[inline]
     fn sort(&mut self) {
         self.items.sort_by(compare_distance);
+    }
+
+    #[inline]
+    fn clear(&mut self) {
+        self.items.clear();
     }
 }
 
@@ -449,5 +465,15 @@ impl<F: Real, const K: usize> ResultSet<F> for SmallKnnResultSet<F, K> {
         // Insertion already keeps the array sorted for the common case.
         // If the user requested unsorted results we would need to sort here,
         // but for SmallKnnResultSet we keep the sorted invariant for simplicity.
+    }
+
+    #[inline]
+    fn clear(&mut self) {
+        for i in 0..self.len {
+            unsafe {
+                self.items[i].assume_init_drop();
+            }
+        }
+        self.len = 0;
     }
 }

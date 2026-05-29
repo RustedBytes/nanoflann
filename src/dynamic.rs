@@ -50,6 +50,12 @@ where
         }
 
         let safe_max = maximum_point_count.max(1);
+        if safe_max > u32::MAX as usize {
+            return Err(KdTreeError::DatasetTooLarge {
+                limit: u32::MAX as usize,
+                got: safe_max,
+            });
+        }
         let tree_count = floor_log2(safe_max) + 1;
         let mut this = Self {
             dataset,
@@ -97,14 +103,17 @@ where
         pos
     }
 
+    #[inline]
     pub fn dim(&self) -> usize {
         self.dim
     }
 
+    #[inline]
     pub fn point_count(&self) -> usize {
         self.point_count
     }
 
+    #[inline]
     pub fn active_count(&self) -> usize {
         self.tree_index
             .iter()
@@ -112,6 +121,7 @@ where
             .count()
     }
 
+    #[inline]
     pub fn all_indices(&self) -> &[KdTree<'a, F, D, M>] {
         &self.indices
     }
@@ -176,20 +186,21 @@ where
                 let dst_tree = &mut right_part[0];
                 for point_idx in src_tree.v_acc.drain(..) {
                     dst_tree.v_acc.push(point_idx);
+                    let point_idx_usize = point_idx as usize;
                     if self
                         .tree_index
-                        .get(point_idx)
+                        .get(point_idx_usize)
                         .and_then(|entry| *entry)
                         .is_some()
                     {
-                        self.tree_index[point_idx] = Some(pos);
+                        self.tree_index[point_idx_usize] = Some(pos);
                     } else {
-                        self.removed_points.insert(point_idx, pos);
+                        self.removed_points.insert(point_idx_usize, pos);
                     }
                 }
             }
 
-            self.indices[pos].v_acc.push(idx);
+            self.indices[pos].v_acc.push(idx as u32);
             self.point_count += 1;
         }
 
@@ -212,6 +223,7 @@ where
         }
     }
 
+    #[inline]
     fn is_active(&self, idx: usize) -> bool {
         self.tree_index.get(idx).and_then(|entry| *entry).is_some()
     }
@@ -258,6 +270,45 @@ where
         Ok(result.into_vec())
     }
 
+    /// Performs a nearest-neighbor search using a caller-provided result set.
+    ///
+    /// This is the most flexible and allocation-efficient entry point for dynamic tree queries.
+    #[inline]
+    pub fn knn_search_into<R: crate::result_set::ResultSet<F>>(
+        &self,
+        query: &[F],
+        result_set: &mut R,
+        search_params: SearchParameters<F>,
+    ) -> Result<()> {
+        self.find_neighbors_result_set(result_set, query, search_params)?;
+        Ok(())
+    }
+
+    /// Performs a radius search using a caller-provided result set.
+    #[inline]
+    pub fn radius_search_into<R: crate::result_set::ResultSet<F>>(
+        &self,
+        query: &[F],
+        result_set: &mut R,
+        search_params: SearchParameters<F>,
+    ) -> Result<()> {
+        self.find_neighbors_result_set(result_set, query, search_params)?;
+        Ok(())
+    }
+
+    /// Performs a radius-limited k-nearest-neighbor search using a caller-provided result set.
+    #[inline]
+    pub fn rknn_search_into<R: crate::result_set::ResultSet<F>>(
+        &self,
+        query: &[F],
+        result_set: &mut R,
+        search_params: SearchParameters<F>,
+    ) -> Result<()> {
+        self.find_neighbors_result_set(result_set, query, search_params)?;
+        Ok(())
+    }
+
+    #[inline]
     fn find_neighbors_result_set<R: crate::result_set::ResultSet<F>>(
         &self,
         result: &mut R,

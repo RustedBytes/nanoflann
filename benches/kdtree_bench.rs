@@ -82,6 +82,88 @@ fn bench_knn_search(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_knn_search_zero_alloc(c: &mut Criterion) {
+    let mut group = c.benchmark_group("knn_search_zero_alloc");
+
+    let sizes = [10_000usize, 100_000];
+    let dims = [2usize, 3, 10];
+    let ks = [1usize, 10, 100];
+
+    for &size in &sizes {
+        for &dim in &dims {
+            let points = generate_random_points(size, dim, 123);
+            let cloud = PointCloud::new(points).expect("valid point cloud");
+            let params = KdTreeParams::default();
+            let tree = KdTree::new(dim, &cloud, L2, params).expect("build ok");
+
+            for &k in &ks {
+                let query = generate_random_query(dim, 999);
+
+                group.throughput(Throughput::Elements(1));
+
+                match k {
+                    1 => {
+                        group.bench_with_input(
+                            BenchmarkId::new("SmallKnn(k=1)", format!("{size}x{dim}D")),
+                            &query,
+                            |b, q| {
+                                b.iter(|| {
+                                    let mut result: nanoflann::SmallKnnResultSet<f64, 1> = nanoflann::SmallKnnResultSet::new();
+                                    tree.knn_search_into(black_box(q), &mut result, Default::default()).expect("search ok");
+                                    black_box(result.len())
+                                })
+                            },
+                        );
+                    }
+                    10 => {
+                        group.bench_with_input(
+                            BenchmarkId::new("SmallKnn(k=10)", format!("{size}x{dim}D")),
+                            &query,
+                            |b, q| {
+                                b.iter(|| {
+                                    let mut result: nanoflann::SmallKnnResultSet<f64, 10> = nanoflann::SmallKnnResultSet::new();
+                                    tree.knn_search_into(black_box(q), &mut result, Default::default()).expect("search ok");
+                                    black_box(result.len())
+                                })
+                            },
+                        );
+                    }
+                    100 => {
+                        group.bench_with_input(
+                            BenchmarkId::new("SmallKnn(k=100)", format!("{size}x{dim}D")),
+                            &query,
+                            |b, q| {
+                                b.iter(|| {
+                                    let mut result: nanoflann::SmallKnnResultSet<f64, 100> = nanoflann::SmallKnnResultSet::new();
+                                    tree.knn_search_into(black_box(q), &mut result, Default::default()).expect("search ok");
+                                    black_box(result.len())
+                                })
+                            },
+                        );
+                    }
+                    _ => {}
+                }
+
+                group.bench_with_input(
+                    BenchmarkId::new(format!("ReusedKnn(k={k})"), format!("{size}x{dim}D")),
+                    &query,
+                    |b, q| {
+                        use nanoflann::ResultSet;
+                        let mut result = nanoflann::KnnResultSet::new(k);
+                        b.iter(|| {
+                            result.clear();
+                            tree.knn_search_into(black_box(q), &mut result, Default::default()).expect("search ok");
+                            black_box(result.size())
+                        })
+                    },
+                );
+            }
+        }
+    }
+
+    group.finish();
+}
+
 fn bench_radius_search(c: &mut Criterion) {
     let mut group = c.benchmark_group("radius_search");
 
@@ -153,6 +235,7 @@ criterion_group!(
     benches,
     bench_construction,
     bench_knn_search,
+    bench_knn_search_zero_alloc,
     bench_radius_search,
     bench_dynamic_construction
 );

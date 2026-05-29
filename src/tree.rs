@@ -122,7 +122,7 @@ where
     metric: M,
     params: KdTreeParams,
     dim: usize,
-    pub(crate) v_acc: Vec<usize>,
+    pub(crate) v_acc: Vec<u32>,
     nodes: Vec<Node<F>>,
     pub(crate) root_node: Option<NodeId>,
     root_bbox: Vec<Interval<F>>,
@@ -167,22 +167,27 @@ where
         Ok(tree)
     }
 
+    #[inline]
     pub fn dim(&self) -> usize {
         self.dim
     }
 
+    #[inline]
     pub fn size(&self) -> usize {
         self.size
     }
 
+    #[inline]
     pub fn size_at_index_build(&self) -> usize {
         self.size_at_index_build
     }
 
+    #[inline]
     pub fn params(&self) -> KdTreeParams {
         self.params
     }
 
+    #[inline]
     pub fn root_bbox(&self) -> &[Interval<F>] {
         &self.root_bbox
     }
@@ -190,6 +195,12 @@ where
     /// Builds or rebuilds the static index over all current dataset points.
     pub fn build_index(&mut self) -> Result<()> {
         self.size = self.dataset.kdtree_get_point_count();
+        if self.size > u32::MAX as usize {
+            return Err(KdTreeError::DatasetTooLarge {
+                limit: u32::MAX as usize,
+                got: self.size,
+            });
+        }
         self.init_vind();
         self.root_node = None;
         self.size_at_index_build = self.size;
@@ -209,6 +220,12 @@ where
 
     pub(crate) fn rebuild_current_indices(&mut self) -> Result<()> {
         self.size = self.v_acc.len();
+        if self.size > u32::MAX as usize {
+            return Err(KdTreeError::DatasetTooLarge {
+                limit: u32::MAX as usize,
+                got: self.size,
+            });
+        }
         self.root_node = None;
         self.size_at_index_build = self.size;
 
@@ -228,14 +245,14 @@ where
 
     fn init_vind(&mut self) {
         self.v_acc.clear();
-        self.v_acc.extend(0..self.size);
+        self.v_acc.extend((0..self.size).map(|i| i as u32));
     }
 
     fn validate_indices(&self) -> Result<()> {
         let len = self.dataset.kdtree_get_point_count();
         for &idx in &self.v_acc {
-            if idx >= len {
-                return Err(KdTreeError::IndexOutOfBounds { index: idx, len });
+            if idx as usize >= len {
+                return Err(KdTreeError::IndexOutOfBounds { index: idx as usize, len });
             }
         }
         Ok(())
@@ -262,13 +279,13 @@ where
         }
 
         for dim in 0..self.dim {
-            let value = self.dataset_get(self.v_acc[0], dim);
+            let value = self.dataset_get(self.v_acc[0] as usize, dim);
             bbox[dim] = Interval::new(value, value);
         }
 
         for &idx in self.v_acc.iter().skip(1) {
             for dim in 0..self.dim {
-                let value = self.dataset_get(idx, dim);
+                let value = self.dataset_get(idx as usize, dim);
                 if value < bbox[dim].low {
                     bbox[dim].low = value;
                 }
@@ -310,13 +327,13 @@ where
 
         if count <= self.params.leaf_max_size {
             for dim in 0..self.dim {
-                let value = self.dataset_get(self.v_acc[left], dim);
+                let value = self.dataset_get(self.v_acc[left] as usize, dim);
                 bbox[dim] = Interval::new(value, value);
             }
             for offset in (left + 1)..right {
                 let idx = self.v_acc[offset];
                 for dim in 0..self.dim {
-                    let value = self.dataset_get(idx, dim);
+                    let value = self.dataset_get(idx as usize, dim);
                     if value < bbox[dim].low {
                         bbox[dim].low = value;
                     }
@@ -336,9 +353,9 @@ where
 
         let (index, cutfeat, cutval) = self.middle_split(left, count, bbox)?;
 
-        let mut left_bbox_local = [Interval::zero(); 32];
+        let mut left_bbox_local = [Interval::zero(); 256];
         let mut left_bbox_vec;
-        let left_bbox = if self.dim <= 32 {
+        let left_bbox = if self.dim <= 256 {
             left_bbox_local[..self.dim].copy_from_slice(&bbox[..self.dim]);
             &mut left_bbox_local[..self.dim]
         } else {
@@ -348,9 +365,9 @@ where
         left_bbox[cutfeat].high = cutval;
         let child1 = self.divide_tree(left, left + index, left_bbox)?;
 
-        let mut right_bbox_local = [Interval::zero(); 32];
+        let mut right_bbox_local = [Interval::zero(); 256];
         let mut right_bbox_vec;
-        let right_bbox = if self.dim <= 32 {
+        let right_bbox = if self.dim <= 256 {
             right_bbox_local[..self.dim].copy_from_slice(&bbox[..self.dim]);
             &mut right_bbox_local[..self.dim]
         } else {
@@ -406,12 +423,12 @@ where
             }
         }
 
-        let mut candidates_local = [0usize; 32];
+        let mut candidates_local = [0usize; 256];
         let mut candidates_len = 0;
         let mut candidates_vec = Vec::new();
         for dim in 0..self.dim {
             if bbox[dim].high - bbox[dim].low >= one_minus_eps * max_span {
-                if self.dim <= 32 {
+                if self.dim <= 256 {
                     candidates_local[candidates_len] = dim;
                     candidates_len += 1;
                 } else {
@@ -419,7 +436,7 @@ where
                 }
             }
         }
-        let candidates = if self.dim <= 32 {
+        let candidates = if self.dim <= 256 {
             if candidates_len == 0 {
                 candidates_local[0] = 0;
                 candidates_len = 1;
@@ -438,12 +455,12 @@ where
         let mut max_elem = F::zero();
 
         for &dim in candidates {
-            let first = self.dataset_get(self.v_acc[ind], dim);
+            let first = self.dataset_get(self.v_acc[ind] as usize, dim);
             let mut local_min = first;
             let mut local_max = first;
 
             for k in 1..count {
-                let value = self.dataset_get(self.v_acc[ind + k], dim);
+                let value = self.dataset_get(self.v_acc[ind + k] as usize, dim);
                 if value < local_min {
                     local_min = value;
                 }
@@ -501,7 +518,7 @@ where
         let mut right = count; // exclusive
 
         while mid < right {
-            let value = self.dataset_get(self.v_acc[ind + mid], cutfeat);
+            let value = self.dataset_get(self.v_acc[ind + mid] as usize, cutfeat);
             if value < cutval {
                 self.v_acc.swap(ind + left, ind + mid);
                 left += 1;
@@ -548,6 +565,7 @@ where
         Ok(())
     }
 
+    #[inline]
     pub(crate) fn find_neighbors_set<R, A>(
         &self,
         result: &mut R,
@@ -566,9 +584,9 @@ where
         let root = self.root_node.ok_or(KdTreeError::IndexNotBuilt)?;
 
         let eps_error = F::one() + search_params.eps;
-        let mut dists_local = [F::zero(); 32];
+        let mut dists_local = [F::zero(); 256];
         let mut dists_vec;
-        let dists = if self.dim <= 32 {
+        let dists = if self.dim <= 256 {
             &mut dists_local[..self.dim]
         } else {
             dists_vec = vec![F::zero(); self.dim];
@@ -583,6 +601,7 @@ where
         Ok(result.full())
     }
 
+    #[inline]
     #[allow(clippy::too_many_arguments)]
     fn search_level<R, A>(
         &self,
@@ -602,7 +621,7 @@ where
         match node {
             Node::Leaf { left, right } => {
                 for offset in *left as usize..*right as usize {
-                    let idx = self.v_acc[offset];
+                    let idx = self.v_acc[offset] as usize;
                     if !active.is_active(idx) {
                         continue;
                     }
@@ -729,7 +748,40 @@ where
     ///
     /// This method directly addresses the remaining hot-path allocation
     /// identified in assembly analysis for small fixed `k`.
+    #[inline]
     pub fn knn_search_into<R: ResultSet<F>>(
+        &self,
+        query: &[F],
+        result_set: &mut R,
+        search_params: SearchParameters<F>,
+    ) -> Result<()> {
+        self.find_neighbors_set(result_set, query, search_params, NoFilter)?;
+        if search_params.sorted {
+            result_set.sort();
+        }
+        Ok(())
+    }
+
+    /// Performs a radius search using a caller-provided result set.
+    ///
+    /// This is the most flexible and allocation-efficient entry point for radius searches.
+    #[inline]
+    pub fn radius_search_into<R: ResultSet<F>>(
+        &self,
+        query: &[F],
+        result_set: &mut R,
+        search_params: SearchParameters<F>,
+    ) -> Result<()> {
+        self.find_neighbors_set(result_set, query, search_params, NoFilter)?;
+        if search_params.sorted {
+            result_set.sort();
+        }
+        Ok(())
+    }
+
+    /// Performs a radius-limited k-nearest-neighbor search using a caller-provided result set.
+    #[inline]
+    pub fn rknn_search_into<R: ResultSet<F>>(
         &self,
         query: &[F],
         result_set: &mut R,
@@ -766,7 +818,7 @@ where
             match node {
                 Node::Leaf { left, right } => {
                     for offset in *left as usize..*right as usize {
-                        let idx = self.v_acc[offset];
+                        let idx = self.v_acc[offset] as usize;
                         if self.contains(bbox, idx) {
                             found.push(idx);
                         }
@@ -825,7 +877,7 @@ where
         write_u64(writer, self.params.leaf_max_size)?;
         write_u64(writer, self.v_acc.len())?;
         for &idx in &self.v_acc {
-            write_u64(writer, idx)?;
+            write_u64(writer, idx as usize)?;
         }
         write_u64(writer, self.root_bbox.len())?;
         for interval in &self.root_bbox {
@@ -865,7 +917,7 @@ where
         self.v_acc.clear();
         self.v_acc.reserve(v_len);
         for _ in 0..v_len {
-            self.v_acc.push(read_u64(reader)?);
+            self.v_acc.push(read_u64(reader)? as u32);
         }
         self.validate_indices()?;
 

@@ -29,6 +29,8 @@ pub enum KdTreeError {
     NonContiguousInsertion { expected: usize, got: usize },
     /// The configured dynamic index capacity has been exceeded.
     MaximumPointCountExceeded { maximum_point_count: usize },
+    /// Dataset contains too many points for internal 32-bit indexing.
+    DatasetTooLarge { limit: usize, got: usize },
     /// Point-cloud construction received rows with inconsistent dimensionality.
     InconsistentPointDimensionality {
         expected: usize,
@@ -78,6 +80,10 @@ impl fmt::Display for KdTreeError {
             } => write!(
                 f,
                 "dynamic index capacity exceeded; maximum_point_count={maximum_point_count}"
+            ),
+            Self::DatasetTooLarge { limit, got } => write!(
+                f,
+                "dataset has {got} points, which exceeds the limit of {limit} for 32-bit indexing"
             ),
             Self::InconsistentPointDimensionality { expected, got, row } => write!(
                 f,

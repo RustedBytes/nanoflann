@@ -19,5 +19,7 @@ pub use dynamic::DynamicKdTree;
 pub use error::{KdTreeError, Result};
 pub use metric::{DistanceMetric, L2Simple, L1, L2, SO2, SO3};
 pub use real::Real;
-pub use result_set::{KnnResultSet, RadiusResultSet, ResultItem, RknnResultSet, SmallKnnResultSet};
+pub use result_set::{
+    KnnResultSet, RadiusResultSet, ResultItem, ResultSet, RknnResultSet, SmallKnnResultSet,
+};
 pub use tree::{Interval, KdTree, KdTreeParams, SearchParameters};
