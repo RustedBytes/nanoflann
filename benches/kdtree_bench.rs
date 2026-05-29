@@ -1,7 +1,7 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, Throughput};
-use nanoflann::{KdTree, KdTreeParams, L2, PointCloud};
-use rand::{Rng, SeedableRng};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use nanoflann::{KdTree, KdTreeParams, PointCloud, L2};
 use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 
 /// Generate a reproducible random point cloud.
 fn generate_random_points(n: usize, dim: usize, seed: u64) -> Vec<Vec<f64>> {
@@ -66,10 +66,7 @@ fn bench_knn_search(c: &mut Criterion) {
 
                 group.throughput(Throughput::Elements(1));
                 group.bench_with_input(
-                    BenchmarkId::new(
-                        format!("k={k}"),
-                        format!("{size}x{dim}D"),
-                    ),
+                    BenchmarkId::new(format!("k={k}"), format!("{size}x{dim}D")),
                     &query,
                     |b, q| {
                         b.iter(|| {
@@ -141,14 +138,8 @@ fn bench_dynamic_construction(c: &mut Criterion) {
                 b.iter(|| {
                     // Dynamic tree with a generous maximum point count
                     let params = KdTreeParams::default();
-                    let dtree = nanoflann::DynamicKdTree::new(
-                        dim,
-                        &cloud,
-                        L2,
-                        params,
-                        size * 2,
-                    )
-                    .expect("dynamic build ok");
+                    let dtree = nanoflann::DynamicKdTree::new(dim, &cloud, L2, params, size * 2)
+                        .expect("dynamic build ok");
                     black_box(dtree)
                 })
             },

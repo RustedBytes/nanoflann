@@ -1,10 +1,18 @@
-use nanoflann::{KdTree, KdTreeParams, MatrixDataset, MatrixLayout, L2};
+use nanoflann::{
+    KdTree, KdTreeParams, MatrixDataset, MatrixLayout, SearchParameters, SmallKnnResultSet, L2,
+};
 
 #[no_mangle]
 #[inline(never)]
 pub fn asm_query_knn_f64_l2(tree: &KdTree<f64, MatrixDataset<f64>, L2>, q: &[f64; 3]) -> usize {
-    let result = tree.knn_search(std::hint::black_box(q), 8).unwrap();
-    std::hint::black_box(result[0].index)
+    let mut result: SmallKnnResultSet<f64, 8> = SmallKnnResultSet::new();
+    tree.knn_search_into(
+        std::hint::black_box(q),
+        &mut result,
+        SearchParameters::default(),
+    )
+    .unwrap();
+    std::hint::black_box(result.as_slice()[0].index)
 }
 
 fn main() {

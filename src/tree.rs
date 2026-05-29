@@ -720,6 +720,28 @@ where
         Ok(result.into_vec())
     }
 
+    /// Performs a nearest-neighbor search using a caller-provided result set.
+    ///
+    /// This is the most flexible and allocation-efficient entry point. Pass any
+    /// type implementing [`ResultSet`](crate::ResultSet), including the
+    /// stack-allocated [`SmallKnnResultSet`](crate::SmallKnnResultSet) for
+    /// zero-heap-allocation small-k queries.
+    ///
+    /// This method directly addresses the remaining hot-path allocation
+    /// identified in assembly analysis for small fixed `k`.
+    pub fn knn_search_into<R: ResultSet<F>>(
+        &self,
+        query: &[F],
+        result_set: &mut R,
+        search_params: SearchParameters<F>,
+    ) -> Result<()> {
+        self.find_neighbors_set(result_set, query, search_params, NoFilter)?;
+        if search_params.sorted {
+            result_set.sort();
+        }
+        Ok(())
+    }
+
     /// Finds all point indices inside `bbox`. Bounds are inclusive.
     pub fn find_within_box(&self, bbox: &[Interval<F>]) -> Result<Vec<usize>> {
         Self::validate_bbox_shape(self.dim, bbox)?;

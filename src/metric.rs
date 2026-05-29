@@ -93,7 +93,8 @@ impl<F: Real + 'static, D: KdTreeDataset<F>> DistanceMetric<F, D> for L2 {
                 let q32 = unsafe { &*(query as *const [F] as *const [f32]) };
                 if let Some(pt) = dataset.kdtree_get_point(b_idx) {
                     let p32 = unsafe { &*(pt as *const [F] as *const [f32]) };
-                    let dist = simd::l2_squared_f32(q32, p32, worst_dist.map(|w| w.to_f64() as f32));
+                    let dist =
+                        simd::l2_squared_f32(q32, p32, worst_dist.map(|w| w.to_f64() as f32));
                     return F::from_f64(dist as f64);
                 } else {
                     // gather fallback (still vectorized in the helper if we wanted, but scalar gather here)
@@ -284,11 +285,7 @@ mod simd {
 
     /// SIMD L2 (squared Euclidean) with early abort support for f32.
     #[inline]
-    pub fn l2_squared_f32(
-        query: &[f32],
-        point: &[f32],
-        worst_dist: Option<f32>,
-    ) -> f32 {
+    pub fn l2_squared_f32(query: &[f32], point: &[f32], worst_dist: Option<f32>) -> f32 {
         let len = query.len().min(point.len());
         let mut sum = f32x8::splat(0.0);
         let mut i = 0;
@@ -328,11 +325,7 @@ mod simd {
 
     /// SIMD L2 (squared Euclidean) with early abort support for f64.
     #[inline]
-    pub fn l2_squared_f64(
-        query: &[f64],
-        point: &[f64],
-        worst_dist: Option<f64>,
-    ) -> f64 {
+    pub fn l2_squared_f64(query: &[f64], point: &[f64], worst_dist: Option<f64>) -> f64 {
         let len = query.len().min(point.len());
         let mut sum = f64x4::splat(0.0);
         let mut i = 0;
@@ -414,4 +407,3 @@ mod simd {
         result
     }
 }
-
