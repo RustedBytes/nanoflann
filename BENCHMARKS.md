@@ -96,25 +96,6 @@ The 0.3.0 release contains significant internal changes (new node representation
      - Construction time for 50k–100k points in 2D/3D
      - knn_search (k=10) latency on 100k-point trees
 
-## Customizing the benchmark
-
-You can extend `benches/kdtree_bench.rs` with:
-- Different metrics (`L1`, `SO3`, etc.)
-- `MatrixDataset` adaptor
-- Larger datasets (be careful with memory)
-- Approximate search (`SearchParameters { eps: 0.1, .. }`)
-- `find_within_box` benchmarks
-
-Pull requests that add meaningful new benchmark scenarios are welcome.
-
-## Continuous benchmarking (optional)
-
-If you want to track performance over time, consider integrating:
-- `cargo-criterion`
-- GitHub Actions + `bencher` or `github-action-benchmark`
-
-The current setup already produces machine-readable JSON in `target/criterion/`.
-
 ## Experimental SIMD acceleration (`simd` feature)
 
 Starting with version 0.3, nanoflann includes an optional **SIMD-accelerated** path for the most common distance metrics (`L2` and `L2Simple`) using Rust's `std::simd` (portable SIMD).
