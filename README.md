@@ -1,6 +1,6 @@
-# nanoflann-rs
+# nanoflann
 
-[![Crates.io Version](https://img.shields.io/crates/v/nanoflann-rs)](https://crates.io/crates/nanoflann-rs)
+[![Crates.io Version](https://img.shields.io/crates/v/nanoflann)](https://crates.io/crates/nanoflann)
 
 A safe Rust KD-tree crate ported from the [nanoflann.hpp](https://github.com/jlblancoc/nanoflann) project.
 
