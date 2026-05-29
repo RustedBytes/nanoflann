@@ -19,9 +19,9 @@ This is not a line-by-line syntax translation. It keeps the behaviorally importa
 ## Example
 
 ```rust
-use nanoflann_rs::{KdTree, KdTreeParams, L2, PointCloud};
+use nanoflann::{KdTree, KdTreeParams, L2, PointCloud};
 
-fn main() -> nanoflann_rs::Result<()> {
+fn main() -> nanoflann::Result<()> {
     let cloud = PointCloud::new(vec![
         vec![0.0, 0.0],
         vec![1.0, 0.0],
