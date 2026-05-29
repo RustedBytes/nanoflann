@@ -645,9 +645,10 @@ where
                         dists,
                         eps_error,
                         active,
-                    )? {
-                        return Ok(false);
-                    }
+                    )?
+                {
+                    return Ok(false);
+                }
 
                 dists[idx] = old_dist;
                 Ok(true)
