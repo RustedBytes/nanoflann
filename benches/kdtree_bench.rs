@@ -165,4 +165,55 @@ criterion_group!(
     bench_radius_search,
     bench_dynamic_construction
 );
+
+// =============================================================================
+// SIMD-specific benchmarks (only available with `cargo +nightly bench --features simd`)
+// These exercise the exact same workloads so you can directly compare numbers
+// between a normal `cargo bench` run (scalar) and a SIMD-enabled run.
+// =============================================================================
+
+#[cfg(feature = "simd")]
+fn bench_knn_search_simd(c: &mut Criterion) {
+    let mut group = c.benchmark_group("knn_search_simd");
+
+    // Use higher dimensions where SIMD tends to shine
+    let sizes = [50_000usize, 200_000];
+    let dims = [8usize, 16, 32];
+    let ks = [1usize, 10];
+
+    for &size in &sizes {
+        for &dim in &dims {
+            let points = generate_random_points(size, dim, 2025);
+            let cloud = PointCloud::new(points).expect("valid point cloud");
+            let params = KdTreeParams::default();
+            let tree = KdTree::new(dim, &cloud, L2, params).expect("build ok");
+
+            for &k in &ks {
+                let query = generate_random_query(dim, 777);
+
+                group.throughput(Throughput::Elements(1));
+                group.bench_with_input(
+                    BenchmarkId::new(format!("k={k}"), format!("{size}x{dim}D")),
+                    &query,
+                    |b, q| {
+                        b.iter(|| {
+                            let results = tree.knn_search(black_box(q), k).expect("search ok");
+                            black_box(results)
+                        })
+                    },
+                );
+            }
+        }
+    }
+
+    group.finish();
+}
+
+#[cfg(feature = "simd")]
+criterion_group!(simd_benches, bench_knn_search_simd);
+
+#[cfg(not(feature = "simd"))]
 criterion_main!(benches);
+
+#[cfg(feature = "simd")]
+criterion_main!(benches, simd_benches);

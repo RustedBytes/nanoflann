@@ -1,3 +1,5 @@
+#![cfg_attr(feature = "simd", feature(portable_simd))]
+
 //! Safe Rust KD-tree port inspired by the nanoflann header-only C++ API.
 //!
 //! The crate keeps nanoflann's core semantics: adaptor-style datasets,

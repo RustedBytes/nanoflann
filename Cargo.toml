@@ -13,6 +13,13 @@ path = "src/lib.rs"
 
 [dependencies]
 
+[features]
+default = []
+# Enables experimental SIMD acceleration using `std::simd` (portable SIMD).
+# Requires a nightly Rust toolchain:
+#   cargo +nightly bench --features simd
+simd = []
+
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
 rand = "0.8"

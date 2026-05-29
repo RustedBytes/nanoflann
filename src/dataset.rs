@@ -19,6 +19,14 @@ pub trait KdTreeDataset<F: Real> {
     /// own generated indices, and query dimensionality is checked before search.
     fn kdtree_get_pt(&self, idx: usize, dim: usize) -> F;
 
+    /// Optional fast path returning a contiguous slice for all coordinates of
+    /// point `idx`. Enables efficient SIMD vector loads in distance metrics.
+    ///
+    /// Default returns `None` (caller falls back to per-component `get_pt`).
+    fn kdtree_get_point(&self, _idx: usize) -> Option<&[F]> {
+        None
+    }
+
     /// Optional precomputed bounding box. Return `true` if `bbox` was filled.
     fn kdtree_get_bbox(&self, _bbox: &mut [Interval<F>]) -> bool {
         false
@@ -96,6 +104,11 @@ impl<F: Real> KdTreeDataset<F> for PointCloud<F> {
     #[inline]
     fn kdtree_get_pt(&self, idx: usize, dim: usize) -> F {
         self.points[idx][dim]
+    }
+
+    #[inline]
+    fn kdtree_get_point(&self, idx: usize) -> Option<&[F]> {
+        self.points.get(idx).map(|v| v.as_slice())
     }
 }
 
@@ -188,6 +201,22 @@ impl<F: Real> KdTreeDataset<F> for MatrixDataset<F> {
         match self.layout {
             MatrixLayout::RowMajorPoints => self.data[idx * self.cols + dim],
             MatrixLayout::ColumnMajorPoints => self.data[dim * self.cols + idx],
+        }
+    }
+
+    #[inline]
+    fn kdtree_get_point(&self, idx: usize) -> Option<&[F]> {
+        match self.layout {
+            MatrixLayout::RowMajorPoints => {
+                let start = idx * self.cols;
+                if start + self.cols <= self.data.len() {
+                    Some(&self.data[start..start + self.cols])
+                } else {
+                    None
+                }
+            }
+            // Column-major: coordinates of a point are strided → no cheap contiguous slice
+            MatrixLayout::ColumnMajorPoints => None,
         }
     }
 }

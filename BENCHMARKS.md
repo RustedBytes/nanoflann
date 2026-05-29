@@ -114,3 +114,41 @@ If you want to track performance over time, consider integrating:
 - GitHub Actions + `bencher` or `github-action-benchmark`
 
 The current setup already produces machine-readable JSON in `target/criterion/`.
+
+## Experimental SIMD acceleration (`simd` feature)
+
+Starting with version 0.3, nanoflann includes an optional **SIMD-accelerated** path for the most common distance metrics (`L2` and `L2Simple`) using Rust's `std::simd` (portable SIMD).
+
+### Requirements
+
+- Nightly Rust toolchain (because `portable_simd` is still unstable)
+- The `simd` feature
+
+### Enabling and running SIMD benchmarks
+
+```bash
+# Scalar (baseline)
+cargo bench
+
+# SIMD version (much faster on modern CPUs for medium+ dimensions)
+cargo +nightly bench --features simd
+```
+
+When the `simd` feature is enabled, the benchmark binary also includes an extra group:
+
+- `knn_search_simd` — same workloads as `knn_search` but compiled with vectorized distance calculations (targets 8–32 dimensions where SIMD gains are largest).
+
+### How the optimization works
+
+- A new optional method `kdtree_get_point(idx) -> Option<&[F]>` was added to `KdTreeDataset` (implemented efficiently for `PointCloud` and row-major `MatrixDataset`).
+- Inside `L2` / `L2Simple`, when `feature = "simd"` is active and the scalar type is `f32` or `f64`, the library dispatches to hand-written SIMD kernels (`f32x8` / `f64x4`) with chunked processing + early exit for `L2`.
+- Non-f32/f64 `Real` types and datasets that don't provide contiguous points fall back to the original scalar implementation.
+
+### Expected speedups
+
+Typical gains (highly dependent on dimension, CPU, and data layout):
+
+- 2–3× in 8–16 dimensions
+- 3–5×+ in 32+ dimensions (when using contiguous storage)
+
+Gains are smaller in very low dimensions (2–4) due to overhead.
